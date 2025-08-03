@@ -20,7 +20,7 @@
         "endpoint": "https://www.alphavantage.co/query",
         "auth": "api_key",
         "rateLimit": "500/day",
-        "enabled": false,
+        "enabled": true,
         "queryParams": {
           "function": "NEWS_SENTIMENT"
         }

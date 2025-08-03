@@ -1,0 +1,95 @@
+{
+  "testRun": {
+    "timestamp": "2025-08-03T22:35:58.224Z",
+    "duration": "Phase 1 Complete",
+    "successRate": 100
+  },
+  "results": [
+    {
+      "source": "NewsAPI.org",
+      "success": true,
+      "dataCount": 0,
+      "sampleData": null,
+      "timestamp": "2025-08-03T22:35:40.439Z"
+    },
+    {
+      "source": "Alpha Vantage News",
+      "success": true,
+      "dataCount": 1,
+      "sampleData": {
+        "title": "American Assets Trust: 7% Yield And Way Too Cheap",
+        "relevanceScore": 0,
+        "symbols": [],
+        "timestamp": "2025-08-03T20:00:00.000Z"
+      },
+      "timestamp": "2025-08-03T22:35:40.756Z"
+    },
+    {
+      "source": "MarketWatch RSS",
+      "success": true,
+      "dataCount": 7,
+      "sampleData": {
+        "title": "U.S. stock futures dip after Friday’s drop on Wall Street; oil falls as OPEC+ extends output boost",
+        "relevanceScore": 0,
+        "symbols": [],
+        "timestamp": "2025-08-03T22:31:00.000Z"
+      },
+      "timestamp": "2025-08-03T22:35:40.770Z"
+    },
+    {
+      "source": "Seeking Alpha RSS",
+      "success": true,
+      "dataCount": 1,
+      "sampleData": {
+        "title": "American Assets Trust: 7% Yield And Way Too Cheap",
+        "relevanceScore": 0,
+        "symbols": [],
+        "timestamp": "2025-08-03T20:00:00.000Z"
+      },
+      "timestamp": "2025-08-03T22:35:40.787Z"
+    },
+    {
+      "source": "Financial Times RSS",
+      "success": true,
+      "dataCount": 2,
+      "sampleData": {
+        "title": "Plastics a ‘grave’ danger to health, scientists warn before UN talks ",
+        "relevanceScore": 0,
+        "symbols": [],
+        "timestamp": "2025-08-03T22:30:29.000Z"
+      },
+      "timestamp": "2025-08-03T22:35:41.269Z"
+    },
+    {
+      "source": "Podcast: Wall Street Breakfast by Seeking Alpha",
+      "success": true,
+      "dataCount": 0,
+      "sampleData": null,
+      "timestamp": "2025-08-03T22:35:42.149Z"
+    },
+    {
+      "source": "Podcast: The Journal by WSJ",
+      "success": true,
+      "dataCount": 0,
+      "sampleData": null,
+      "timestamp": "2025-08-03T22:35:42.404Z"
+    },
+    {
+      "source": "Podcast: Chat with Traders",
+      "success": true,
+      "dataCount": 0,
+      "sampleData": null,
+      "timestamp": "2025-08-03T22:35:42.888Z"
+    },
+    {
+      "source": "Gmail",
+      "success": true,
+      "dataCount": -1,
+      "sampleData": {
+        "targetSenders": 7,
+        "testDuration": 15335
+      },
+      "timestamp": "2025-08-03T22:35:58.223Z"
+    }
+  ]
+}

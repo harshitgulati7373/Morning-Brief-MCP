@@ -176,7 +176,7 @@ export class GmailService {
     if (senders && senders.length > 0) {
       const senderQuery = senders.map(sender => `from:${sender}`).join(' OR ');
       queryParts.push(`(${senderQuery})`);
-    } else if (this.config.targetSenders.length > 0) {
+    } else if (this.config.targetSenders && this.config.targetSenders.length > 0) {
       const senderQuery = this.config.targetSenders.map(sender => `from:${sender}`).join(' OR ');
       queryParts.push(`(${senderQuery})`);
     }
@@ -188,13 +188,13 @@ export class GmailService {
     }
 
     // Add label filters
-    if (this.config.labels.length > 0) {
+    if (this.config.labels && this.config.labels.length > 0) {
       const labelQuery = this.config.labels.map(label => `label:${label}`).join(' OR ');
       queryParts.push(`(${labelQuery})`);
     }
 
     // Exclude patterns
-    if (this.config.excludePatterns.length > 0) {
+    if (this.config.excludePatterns && this.config.excludePatterns.length > 0) {
       this.config.excludePatterns.forEach(pattern => {
         queryParts.push(`-"${pattern}"`);
       });
