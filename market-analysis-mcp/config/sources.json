@@ -1,0 +1,99 @@
+{
+  "news": {
+    "sources": [
+      {
+        "name": "NewsAPI.org",
+        "type": "api",
+        "endpoint": "https://newsapi.org/v2/everything",
+        "auth": "api_key",
+        "rateLimit": "1000/day",
+        "enabled": true,
+        "queryParams": {
+          "domains": "bloomberg.com,reuters.com,marketwatch.com,cnbc.com,wsj.com",
+          "sortBy": "publishedAt",
+          "language": "en"
+        }
+      },
+      {
+        "name": "Alpha Vantage News",
+        "type": "api", 
+        "endpoint": "https://www.alphavantage.co/query",
+        "auth": "api_key",
+        "rateLimit": "500/day",
+        "enabled": false,
+        "queryParams": {
+          "function": "NEWS_SENTIMENT"
+        }
+      },
+      {
+        "name": "MarketWatch RSS",
+        "type": "rss",
+        "endpoint": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+        "rateLimit": "60/hour",
+        "enabled": true
+      },
+      {
+        "name": "Seeking Alpha RSS",
+        "type": "rss",
+        "endpoint": "https://seekingalpha.com/feed.xml",
+        "rateLimit": "60/hour", 
+        "enabled": true
+      },
+      {
+        "name": "Financial Times RSS",
+        "type": "rss",
+        "endpoint": "https://www.ft.com/rss/home",
+        "rateLimit": "60/hour",
+        "enabled": true
+      }
+    ]
+  },
+  "podcasts": [
+    {
+      "name": "Wall Street Breakfast by Seeking Alpha",
+      "rssUrl": "https://feeds.simplecast.com/54nAGcIl",
+      "transcriptionService": "openai-whisper",
+      "enabled": true,
+      "description": "Short daily episodes (~10 min) summarizing key market-moving news, earnings, economic reports, and global events before U.S. markets open"
+    },
+    {
+      "name": "The Journal by WSJ",
+      "rssUrl": "https://video-api.wsj.com/podcast/rss/wsj/the-journal",
+      "transcriptionService": "openai-whisper",
+      "enabled": true,
+      "description": "Daily news and market analysis from The Wall Street Journal with deep dives into business stories"
+    },
+    {
+      "name": "Chat with Traders",
+      "rssUrl": "https://chatwithtraders.libsyn.com/rss",
+      "transcriptionService": "openai-whisper",
+      "enabled": true,
+      "description": "Interviews with successful traders and market professionals sharing strategies and insights"
+    }
+  ],
+  "gmail": {
+    "targetSenders": [
+      "carbonfinance@news.carbonfinance.io",
+      "tictoctrading@substack.com",
+      "crew@morningbrew.com",
+      "wealthwisedca@substack.com",
+      "account@seekingalpha.com",
+      "contact@stockanalysis.com",
+      "hi@morningdownload.com"
+    ],
+    "enabled": true
+  },
+  "relevanceScoring": {
+    "marketKeywords": {
+      "high": ["earnings", "fed", "federal reserve", "interest rates", "inflation", "gdp", "unemployment"],
+      "medium": ["market", "trading", "stock", "bond", "crypto", "forex"],
+      "low": ["price", "volume", "trend", "analysis"]
+    },
+    "weights": {
+      "marketKeywords": 40,
+      "stockSymbols": 30,
+      "sourceAuthority": 20,
+      "recency": 10
+    }
+  }
+}
