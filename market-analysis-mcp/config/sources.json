@@ -85,13 +85,13 @@
   },
   "relevanceScoring": {
     "marketKeywords": {
-      "high": ["earnings", "fed", "federal reserve", "interest rates", "inflation", "gdp", "unemployment"],
-      "medium": ["market", "trading", "stock", "bond", "crypto", "forex"],
-      "low": ["price", "volume", "trend", "analysis"]
+      "high": ["earnings", "fed", "federal reserve", "interest rates", "inflation", "gdp", "unemployment", "artificial intelligence", "ai", "bitcoin", "cryptocurrency", "recession", "china trade"],
+      "medium": ["market", "trading", "stock", "bond", "crypto", "forex", "semiconductor", "electric vehicle", "ev", "renewable energy", "supply chain", "geopolitics"],
+      "low": ["price", "volume", "trend", "analysis", "technical analysis", "chart", "support", "resistance"]
     },
     "weights": {
-      "marketKeywords": 40,
-      "stockSymbols": 30,
+      "marketKeywords": 35,
+      "stockSymbols": 35,
       "sourceAuthority": 20,
       "recency": 10
     }

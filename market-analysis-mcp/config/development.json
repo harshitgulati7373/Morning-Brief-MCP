@@ -1,0 +1,32 @@
+{
+  "environment": "development",
+  "port": 3000,
+  "database": {
+    "path": "./data/market_data.db",
+    "options": {
+      "journal_mode": "WAL",
+      "synchronous": "NORMAL"
+    }
+  },
+  "apis": {
+    "newsApi": {
+      "baseUrl": "https://newsapi.org/v2",
+      "rateLimit": 100
+    },
+    "gmail": {
+      "redirectUri": "http://localhost:3000/auth/callback"
+    },
+    "podcast": {
+      "baseUrl": "https://api.podcastindex.org",
+      "rateLimit": 50
+    }
+  },
+  "cache": {
+    "ttl": 300000,
+    "maxSize": 1000
+  },
+  "logging": {
+    "level": "debug",
+    "filePath": "./logs/market-mcp.log"
+  }
+}

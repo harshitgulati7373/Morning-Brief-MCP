@@ -1,0 +1,32 @@
+{
+  "environment": "test",
+  "port": 3001,
+  "database": {
+    "path": "./data/test_cache.db",
+    "options": {
+      "journal_mode": "MEMORY",
+      "synchronous": "OFF"
+    }
+  },
+  "apis": {
+    "newsApi": {
+      "baseUrl": "https://newsapi.org/v2",
+      "rateLimit": 10
+    },
+    "gmail": {
+      "redirectUri": "http://localhost:3001/auth/callback"
+    },
+    "podcast": {
+      "baseUrl": "https://api.podcastindex.org",
+      "rateLimit": 10
+    }
+  },
+  "cache": {
+    "ttl": 60000,
+    "maxSize": 100
+  },
+  "logging": {
+    "level": "error",
+    "filePath": "./logs/test.log"
+  }
+}

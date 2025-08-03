@@ -34,6 +34,17 @@ export class RelevanceScorer {
       ['Chat with Traders', 85],
       ['The Meb Faber Research Podcast', 80],
       ['Gmail', 60], // Variable based on sender
+      ['Alpha Vantage News', 85],
+      ['NewsAPI.org', 75],
+      ['MarketWatch RSS', 80],
+      ['Seeking Alpha RSS', 65],
+      ['Financial Times RSS', 90],
+      ['Wall Street Breakfast by Seeking Alpha', 80],
+      ['The Journal by WSJ', 90],
+      ['Chat with Traders', 75],
+      ['Gmail - Morning Brew', 70],
+      ['Gmail - Carbon Finance', 65],
+      ['Gmail - Stock Analysis', 75],
     ]);
   }
 
