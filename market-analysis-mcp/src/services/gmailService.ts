@@ -4,17 +4,19 @@ import { CacheManager } from '../utils/cache';
 import { RateLimiter } from '../utils/rateLimiter';
 import { TimeUtils } from '../utils/timeUtils';
 import { MarketDataItem, GmailConfig, ProcessingResult, EmailData } from '../types/marketData';
+import { BaseService } from './BaseService';
 
-export class GmailService {
+export class GmailService extends BaseService {
   private gmail: any;
   private auth: any;
 
   constructor(
     private config: GmailConfig,
-    private cache: CacheManager,
-    private rateLimiter: RateLimiter,
-    private logger: Logger
+    cache: CacheManager,
+    rateLimiter: RateLimiter,
+    logger: Logger
   ) {
+    super(cache, rateLimiter, logger);
     this.initializeAuth();
   }
 
@@ -82,33 +84,16 @@ export class GmailService {
     }
 
     try {
-      const cacheKey = this.cache.generateKey('emails', { timeframe, senders, keywords });
+      const cacheKey = this.generateCacheKey('emails', { timeframe, senders, keywords });
       
-      const cached = await this.cache.get(cacheKey);
-      if (cached) {
-        this.logger.info('Returning cached email data');
-        return { success: true, data: cached, cached: true };
-      }
+      const data = await this.cacheOperation(cacheKey, async () => {
+        return await this.fetchEmailData(timeframe, senders, keywords);
+      }, TimeUtils.getOptimalCacheTTL('email'));
 
-      const emails = await this.fetchEmails(timeframe, senders, keywords);
-      const marketDataItems = emails.map(email => this.convertEmailToMarketData(email));
-
-      const filteredEmails = marketDataItems.filter(item => 
-        TimeUtils.isWithinTimeframe(item.timestamp, timeframe)
-      );
-
-      filteredEmails.sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-
-      const ttl = TimeUtils.getOptimalCacheTTL('email');
-      await this.cache.set(cacheKey, filteredEmails, ttl);
-
-      this.logger.info(`Fetched ${filteredEmails.length} relevant emails`);
-      
-      return { success: true, data: filteredEmails };
+      this.logger.info(`Fetched ${data.length} relevant emails`);
+      return { success: true, data };
     } catch (error) {
-      this.logger.error('Error fetching emails:', error);
+      this.handleError(error as Error, 'getRelevantEmails');
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error fetching emails' 
@@ -116,15 +101,31 @@ export class GmailService {
     }
   }
 
+  private async fetchEmailData(
+    timeframe: string,
+    senders?: string[],
+    keywords?: string[]
+  ): Promise<MarketDataItem[]> {
+    const emails = await this.fetchEmails(timeframe, senders, keywords);
+    const marketDataItems = emails.map(email => this.convertEmailToMarketData(email));
+
+    const filteredEmails = marketDataItems.filter(item => 
+      TimeUtils.isWithinTimeframe(item.timestamp, timeframe)
+    );
+
+    filteredEmails.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return filteredEmails;
+  }
+
   private async fetchEmails(
     timeframe: string,
     senders?: string[],
     keywords?: string[]
   ): Promise<EmailData[]> {
-    return this.rateLimiter.withRetry(
-      'gmail-api',
-      '250/second', // Gmail API quota
-      async () => {
+    return this.executeWithRateLimit(async () => {
         const query = this.buildSearchQuery(timeframe, senders, keywords);
         
         const response = await this.gmail.users.messages.list({
@@ -156,8 +157,7 @@ export class GmailService {
         }
 
         return emailDetails;
-      }
-    );
+      }, 'gmail-api', '250/second'); // Gmail API quota
   }
 
   private buildSearchQuery(

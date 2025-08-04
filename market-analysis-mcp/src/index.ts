@@ -10,6 +10,8 @@ import dotenv from 'dotenv';
 import winston from 'winston';
 import { CacheManager } from './utils/cache.js';
 import { RateLimiter } from './utils/rateLimiter.js';
+import { SecurityValidator } from './utils/SecurityValidator.js';
+import { ErrorHandler } from './utils/ErrorHandler.js';
 import { NewsService } from './services/newsService.js';
 import { PodcastService } from './services/podcastService.js';
 import { GmailService } from './services/gmailService.js';
@@ -80,6 +82,11 @@ class MarketAnalysisMCPServer {
     this.rateLimiter = new RateLimiter();
     
     this.setupHandlers();
+    
+    // Setup periodic cleanup of expired rate limit entries
+    setInterval(() => {
+      SecurityValidator.cleanupExpiredEntries();
+    }, 15 * 60 * 1000); // Cleanup every 15 minutes
   }
 
   async initialize(): Promise<void> {
@@ -276,29 +283,88 @@ class MarketAnalysisMCPServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-
+      
+      // Generate client ID for rate limiting (based on request metadata or use default)
+      const clientId = this.getClientId(request);
+      
       try {
+        // Security validations
+        if (!SecurityValidator.validateRequestStructure(request.params)) {
+          const error = ErrorHandler.createStructuredError(
+            'INVALID_REQUEST_STRUCTURE',
+            'Request structure validation failed',
+            { tool: name }
+          );
+          logger.warn('Invalid request structure detected', error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Error: Invalid request structure.'
+              }
+            ]
+          };
+        }
+
+        // Rate limiting check
+        if (SecurityValidator.isRateLimitExceeded(clientId, 1000)) { // 1000 requests per hour per client
+          const error = ErrorHandler.createStructuredError(
+            'RATE_LIMIT_EXCEEDED',
+            'Rate limit exceeded for client',
+            { clientId, tool: name, remaining: SecurityValidator.getRemainingRequests(clientId, 1000) }
+          );
+          logger.warn('Rate limit exceeded', error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Error: Rate limit exceeded. Please try again later.'
+              }
+            ]
+          };
+        }
+
+        // Sanitize input arguments
+        const sanitizedArgs = SecurityValidator.sanitizeInput(args);
+
         switch (name) {
           case 'get_market_news':
-            return await this.newsTools.getMarketNews(args);
+            return await this.newsTools.getMarketNews(sanitizedArgs);
 
           case 'get_podcast_summaries':
-            return await this.podcastTools.getPodcastSummaries(args);
+            return await this.podcastTools.getPodcastSummaries(sanitizedArgs);
 
           case 'get_relevant_emails':
-            return await this.gmailTools.getRelevantEmails(args);
+            return await this.gmailTools.getRelevantEmails(sanitizedArgs);
 
           case 'get_market_snapshot':
-            return await this.unifiedTools.getMarketSnapshot(args);
+            return await this.unifiedTools.getMarketSnapshot(sanitizedArgs);
 
           case 'search_market_data':
-            return await this.searchTools.searchMarketData(args);
+            return await this.searchTools.searchMarketData(sanitizedArgs);
 
           default:
+            const error = ErrorHandler.createStructuredError(
+              'UNKNOWN_TOOL',
+              `Unknown tool requested: ${name}`,
+              { tool: name }
+            );
+            logger.error('Unknown tool requested', error);
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        logger.error(`Tool execution error for ${name}:`, error);
+        const structuredError = ErrorHandler.createStructuredError(
+          'TOOL_EXECUTION_ERROR',
+          `Tool execution error for ${name}`,
+          { 
+            tool: name, 
+            clientId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          }
+        );
+        ErrorHandler.logError(structuredError, logger);
+        
         return {
           content: [
             {
@@ -309,6 +375,13 @@ class MarketAnalysisMCPServer {
         };
       }
     });
+  }
+
+  private getClientId(request: any): string {
+    // In a real implementation, you might extract client ID from request headers,
+    // authentication tokens, or other metadata. For now, use a default.
+    // This could be enhanced to use actual client identification.
+    return request.id || request.clientId || 'default-client';
   }
 
   async start(): Promise<void> {

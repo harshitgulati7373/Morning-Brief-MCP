@@ -1,44 +1,41 @@
 # Dependencies
-node_modules/
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build outputs
-dist/
-build/
+# Build outputs (will be built inside container)
+dist
+build
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Development files
+.env*
+!.env.example
 
 # Logs
-logs/
+logs
 *.log
 
-# Database and cache files
-data/
+# Database and cache files (should be mounted as volumes)
+data
 *.db
 *.sqlite
 
 # Runtime data
-pids/
+pids
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
-coverage/
+# Coverage directory
+coverage
 *.lcov
 
 # nyc test coverage
-.nyc_output/
+.nyc_output
 
 # Dependency directories
-jspm_packages/
+jspm_packages
 
 # Optional npm cache directory
 .npm
@@ -47,10 +44,10 @@ jspm_packages/
 .eslintcache
 
 # Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
+.rpt2_cache
+.rts2_cache_cjs
+.rts2_cache_es
+.rts2_cache_umd
 
 # Optional REPL history
 .node_repl_history
@@ -61,7 +58,7 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# parcel-bundler cache (https://parceljs.org/)
+# parcel-bundler cache
 .cache
 .parcel-cache
 
@@ -70,19 +67,18 @@ jspm_packages/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
 
 # Storybook build outputs
 .out
 .storybook-out
 
 # Temporary folders
-tmp/
-temp/
+tmp
+temp
 
 # Editor directories and files
-.vscode/
-.idea/
+.vscode
+.idea
 *.swp
 *.swo
 *~
@@ -96,6 +92,32 @@ temp/
 ehthumbs.db
 Thumbs.db
 
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/__tests__
+**/tests
+test-*
+*-test.*
+
+# Development scripts
+scripts/test-*
+scripts/setup-*
+
 # Audio files (for podcast processing)
 *.mp3
 *.wav
@@ -103,14 +125,21 @@ Thumbs.db
 *.aac
 
 # Transcript cache
-transcripts/
-audio_cache/
+transcripts
+audio_cache
+
+# Backup files
+backup-*
+*.backup
+
+# Temporary development files
+*.tmp
+*.temp
 
 # Test artifacts
 *-snapshot-*.md
 test-results*.json
 COMPREHENSIVE_TEST_RESULTS*.md
 
-# Temporary development files
-*.tmp
-*.temp
+# Production optimization plan
+PRODUCTION_OPTIMIZATION_PLAN.md

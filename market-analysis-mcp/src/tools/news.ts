@@ -1,6 +1,7 @@
 import { NewsService } from '../services/newsService';
 import { RelevanceScorer } from '../services/relevanceScorer';
 import { MarketDataItem } from '../types/marketData';
+import { ToolFormatter } from '../utils/ToolFormatter';
 
 export class NewsTools {
   constructor(
@@ -19,18 +20,19 @@ export class NewsTools {
           content: [
             {
               type: 'text',
-              text: `Error fetching news: ${result.error}`
+              text: ToolFormatter.formatErrorResponse(new Error(result.error), 'fetching news')
             }
           ]
         };
       }
 
       if (!result.data || result.data.length === 0) {
+        const timeframeFormatted = ToolFormatter.formatTimeframe(this.parseTimeframe(timeframe));
         return {
           content: [
             {
               type: 'text',
-              text: 'No news articles found for the specified criteria.'
+              text: ToolFormatter.generateMarkdownSummary([], 'Market News Summary', timeframeFormatted, false)
             }
           ]
         };
@@ -42,12 +44,12 @@ export class NewsTools {
       // Sort by relevance score
       scoredNews.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-      const response = this.formatNewsResponse(scoredNews, {
-        timeframe,
-        symbols,
-        limit,
-        cached: result.cached
-      });
+      const timeframeFormatted = ToolFormatter.formatTimeframe(this.parseTimeframe(timeframe));
+      const response = ToolFormatter.generateMarkdownSummary(
+        scoredNews,
+        'Market News Summary',
+        timeframeFormatted
+      );
 
       return {
         content: [
@@ -62,7 +64,7 @@ export class NewsTools {
         content: [
           {
             type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+            text: ToolFormatter.formatErrorResponse(error instanceof Error ? error : new Error('Unknown error occurred'))
           }
         ]
       };
@@ -86,130 +88,22 @@ export class NewsTools {
     };
   }
 
-  private formatNewsResponse(news: MarketDataItem[], metadata: any): string {
-    const lines: string[] = [];
-
-    // Header
-    lines.push('# Market News Summary');
-    lines.push('');
-    lines.push(`**Timeframe**: ${metadata.timeframe}`);
-    lines.push(`**Articles Found**: ${news.length}`);
-    if (metadata.symbols) {
-      lines.push(`**Filtered by Symbols**: ${metadata.symbols.join(', ')}`);
+  private parseTimeframe(timeframe: string): number {
+    const match = timeframe.match(/(\d+)([hdw])/);
+    if (!match) return 24; // Default to 24 hours
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    switch (unit) {
+      case 'h': return value;
+      case 'd': return value * 24;
+      case 'w': return value * 24 * 7;
+      default: return 24;
     }
-    if (metadata.cached) {
-      lines.push('**Source**: Cached data');
-    }
-    lines.push('');
-
-    // High relevance items first
-    const highRelevance = news.filter(item => item.relevanceScore >= 70);
-    const mediumRelevance = news.filter(item => item.relevanceScore >= 40 && item.relevanceScore < 70);
-    const lowRelevance = news.filter(item => item.relevanceScore < 40);
-
-    if (highRelevance.length > 0) {
-      lines.push('## 🔥 High Relevance News');
-      lines.push('');
-      highRelevance.forEach(item => {
-        lines.push(this.formatNewsItem(item));
-      });
-      lines.push('');
-    }
-
-    if (mediumRelevance.length > 0) {
-      lines.push('## 📈 Medium Relevance News');
-      lines.push('');
-      mediumRelevance.forEach(item => {
-        lines.push(this.formatNewsItem(item));
-      });
-      lines.push('');
-    }
-
-    if (lowRelevance.length > 0) {
-      lines.push('## 📊 Other News');
-      lines.push('');
-      lowRelevance.forEach(item => {
-        lines.push(this.formatNewsItem(item));
-      });
-    }
-
-    // Summary statistics
-    lines.push('');
-    lines.push('## Summary Statistics');
-    lines.push('');
-    lines.push(`- **High Relevance**: ${highRelevance.length} articles`);
-    lines.push(`- **Medium Relevance**: ${mediumRelevance.length} articles`);
-    lines.push(`- **Low Relevance**: ${lowRelevance.length} articles`);
-
-    const sentimentStats = this.calculateSentimentStats(news);
-    lines.push(`- **Sentiment**: ${sentimentStats.positive} positive, ${sentimentStats.neutral} neutral, ${sentimentStats.negative} negative`);
-
-    const uniqueSources = new Set(news.map(item => item.sourceDetails.name));
-    lines.push(`- **Sources**: ${Array.from(uniqueSources).join(', ')}`);
-
-    const allSymbols = news.flatMap(item => item.symbols || []);
-    const uniqueSymbols = [...new Set(allSymbols)];
-    if (uniqueSymbols.length > 0) {
-      lines.push(`- **Mentioned Symbols**: ${uniqueSymbols.slice(0, 10).join(', ')}${uniqueSymbols.length > 10 ? '...' : ''}`);
-    }
-
-    return lines.join('\n');
   }
 
-  private formatNewsItem(item: MarketDataItem): string {
-    const lines: string[] = [];
-    
-    const sentimentEmoji = {
-      positive: '📈',
-      negative: '📉',
-      neutral: '📊'
-    }[item.sentiment || 'neutral'];
 
-    const date = new Date(item.timestamp).toLocaleString();
-    
-    lines.push(`### ${sentimentEmoji} ${item.title}`);
-    lines.push('');
-    lines.push(`**Source**: ${item.sourceDetails.name}`);
-    lines.push(`**Time**: ${date}`);
-    lines.push(`**Relevance Score**: ${item.relevanceScore.toFixed(1)}/100`);
-    
-    if (item.symbols && item.symbols.length > 0) {
-      lines.push(`**Symbols**: ${item.symbols.join(', ')}`);
-    }
-    
-    if (item.marketTags.length > 0) {
-      lines.push(`**Tags**: ${item.marketTags.join(', ')}`);
-    }
-    
-    if (item.sentiment) {
-      lines.push(`**Sentiment**: ${item.sentiment}`);
-    }
-
-    lines.push('');
-    lines.push(`**Summary**: ${item.summary}`);
-
-    if (item.sourceDetails.url) {
-      lines.push(`**Link**: ${item.sourceDetails.url}`);
-    }
-
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-
-    return lines.join('\n');
-  }
-
-  private calculateSentimentStats(news: MarketDataItem[]): { positive: number; negative: number; neutral: number } {
-    const stats = { positive: 0, negative: 0, neutral: 0 };
-    
-    news.forEach(item => {
-      if (item.sentiment === 'positive') stats.positive++;
-      else if (item.sentiment === 'negative') stats.negative++;
-      else stats.neutral++;
-    });
-
-    return stats;
-  }
 
   async searchNews(query: string, timeframe: string = '7d', minRelevance: number = 50): Promise<MarketDataItem[]> {
     const results = await this.newsService.searchNews(query, timeframe, 100);

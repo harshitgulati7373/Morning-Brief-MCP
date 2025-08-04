@@ -1,0 +1,86 @@
+{
+  "news": {
+    "sources": [
+      {
+        "name": "Test Bloomberg API",
+        "type": "api",
+        "endpoint": "https://test-bloomberg.com/api/v1/news",
+        "auth": "bearer",
+        "rateLimit": "100/hour",
+        "enabled": true
+      },
+      {
+        "name": "Test MarketWatch RSS",
+        "type": "rss",
+        "endpoint": "https://test-marketwatch.com/rss",
+        "auth": "none",
+        "rateLimit": "50/hour",
+        "enabled": true
+      }
+    ]
+  },
+  "podcasts": [
+    {
+      "name": "Test Trading Podcast",
+      "rssUrl": "https://test-trading-podcast.com/feed.xml",
+      "transcriptionService": "openai-whisper",
+      "enabled": true
+    },
+    {
+      "name": "Test Investment Show",
+      "rssUrl": "https://test-investment-show.com/rss",
+      "transcriptionService": "assembly-ai",
+      "enabled": false
+    }
+  ],
+  "gmail": {
+    "targetSenders": [
+      "newsletter@morningbrew.com",
+      "updates@carbonfinance.com",
+      "alerts@stockanalysis.com"
+    ],
+    "labels": ["Finance", "Newsletter", "Market-Updates"],
+    "excludePatterns": ["spam", "promotional"],
+    "enabled": true
+  },
+  "relevanceScoring": {
+    "marketKeywords": {
+      "high": [
+        "earnings",
+        "IPO",
+        "merger",
+        "acquisition",
+        "bull market",
+        "bear market",
+        "fed rate",
+        "interest rate",
+        "inflation"
+      ],
+      "medium": [
+        "stock",
+        "market",
+        "trading",
+        "investment",
+        "portfolio",
+        "dividend",
+        "revenue",
+        "profit"
+      ],
+      "low": [
+        "price",
+        "volume",
+        "analysis",
+        "report",
+        "news",
+        "update",
+        "company"
+      ]
+    },
+    "weights": {
+      "marketKeywords": 30,
+      "stockSymbols": 25,
+      "sourceAuthority": 25,
+      "recency": 20
+    }
+  }
+}

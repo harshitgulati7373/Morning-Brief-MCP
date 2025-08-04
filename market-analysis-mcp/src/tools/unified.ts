@@ -3,6 +3,7 @@ import { PodcastService } from '../services/podcastService';
 import { GmailService } from '../services/gmailService';
 import { RelevanceScorer } from '../services/relevanceScorer';
 import { MarketDataItem, MarketSnapshot } from '../types/marketData';
+import { ToolFormatter } from '../utils/ToolFormatter';
 
 export class UnifiedTools {
   constructor(
@@ -48,11 +49,12 @@ export class UnifiedTools {
       }
 
       if (allData.length === 0) {
+        const timeframeFormatted = ToolFormatter.formatTimeframe(this.parseTimeframe(timeframe));
         return {
           content: [
             {
               type: 'text',
-              text: 'No market data found across any sources for the specified timeframe.'
+              text: ToolFormatter.generateMarkdownSummary([], 'Market Snapshot', timeframeFormatted, false)
             }
           ]
         };
@@ -78,7 +80,10 @@ export class UnifiedTools {
         content: [
           {
             type: 'text',
-            text: `Error generating market snapshot: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+            text: ToolFormatter.formatErrorResponse(
+              error instanceof Error ? error : new Error('Unknown error occurred'),
+              'generating market snapshot'
+            )
           }
         ]
       };
@@ -242,12 +247,28 @@ export class UnifiedTools {
     return lines.join(' ');
   }
 
+  private parseTimeframe(timeframe: string): number {
+    const match = timeframe.match(/(\d+)([hdw])/);
+    if (!match) return 6; // Default to 6 hours for snapshots
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    switch (unit) {
+      case 'h': return value;
+      case 'd': return value * 24;
+      case 'w': return value * 24 * 7;
+      default: return 6;
+    }
+  }
+
   private formatSnapshotResponse(snapshot: MarketSnapshot, timeframe: string): string {
+    const timeframeFormatted = ToolFormatter.formatTimeframe(this.parseTimeframe(timeframe));
     const lines: string[] = [];
 
     lines.push('# 📊 Market Snapshot');
     lines.push('');
-    lines.push(`**Timeframe**: ${timeframe}`);
+    lines.push(`**Timeframe**: ${timeframeFormatted}`);
     lines.push(`**Generated**: ${new Date().toLocaleString()}`);
     lines.push('');
 
@@ -257,32 +278,22 @@ export class UnifiedTools {
     lines.push(snapshot.summary);
     lines.push('');
 
-    // Source breakdown
-    lines.push('## Source Breakdown');
-    lines.push('');
-    lines.push(`- **News Articles**: ${snapshot.sourceBreakdown.news}`);
-    lines.push(`- **Podcast Episodes**: ${snapshot.sourceBreakdown.podcasts}`);
-    lines.push(`- **Emails**: ${snapshot.sourceBreakdown.emails}`);
-    lines.push(`- **Total Items**: ${snapshot.sourceBreakdown.news + snapshot.sourceBreakdown.podcasts + snapshot.sourceBreakdown.emails}`);
+    // Source breakdown  
+    lines.push(ToolFormatter.createSectionHeader('Source Breakdown', '📁'));
+    lines.push(ToolFormatter.generateSourceBreakdown(this.flattenSnapshotItems(snapshot)));
     lines.push('');
 
     // Alert items
     if (snapshot.alertItems.length > 0) {
-      lines.push('## 🚨 Critical Alerts');
-      lines.push('');
+      lines.push(ToolFormatter.createSectionHeader('Critical Alerts', '🚨'));
       snapshot.alertItems.forEach(item => {
-        const sourceEmoji = this.getSourceEmoji(item.source);
-        lines.push(`### ${sourceEmoji} ${item.title}`);
-        lines.push(`**Score**: ${item.relevanceScore.toFixed(1)}/100 | **Source**: ${item.sourceDetails.name} | **Time**: ${new Date(item.timestamp).toLocaleString()}`);
-        lines.push(`**Summary**: ${item.summary}`);
-        lines.push('');
+        lines.push(ToolFormatter.formatMarketItem(item));
       });
     }
 
     // Cross-source patterns
     if (snapshot.crossSourcePatterns.length > 0) {
-      lines.push('## 🔗 Cross-Source Patterns');
-      lines.push('');
+      lines.push(ToolFormatter.createSectionHeader('Cross-Source Patterns', '🔗'));
       snapshot.crossSourcePatterns.forEach(pattern => {
         lines.push(`- ${pattern}`);
       });
@@ -291,29 +302,17 @@ export class UnifiedTools {
 
     // Key events
     if (snapshot.keyEvents.length > 0) {
-      lines.push('## 📈 Key Events');
-      lines.push('');
+      lines.push(ToolFormatter.createSectionHeader('Key Events', '📈'));
       snapshot.keyEvents.forEach(item => {
-        const sourceEmoji = this.getSourceEmoji(item.source);
-        lines.push(`### ${sourceEmoji} ${item.title}`);
-        lines.push(`**Score**: ${item.relevanceScore.toFixed(1)}/100 | **Source**: ${item.sourceDetails.name}`);
-        if (item.symbols && item.symbols.length > 0) {
-          lines.push(`**Symbols**: ${item.symbols.join(', ')}`);
-        }
-        lines.push(`**Summary**: ${item.summary}`);
-        lines.push('');
+        lines.push(ToolFormatter.formatMarketItem(item));
       });
     }
 
     return lines.join('\n');
   }
 
-  private getSourceEmoji(source: string): string {
-    switch (source) {
-      case 'news': return '📰';
-      case 'podcast': return '🎙️';
-      case 'email': return '📧';
-      default: return '📄';
-    }
+  private flattenSnapshotItems(snapshot: MarketSnapshot): MarketDataItem[] {
+    return [...snapshot.keyEvents, ...snapshot.alertItems];
   }
+
 }

@@ -3,6 +3,8 @@ import { PodcastService } from '../services/podcastService';
 import { GmailService } from '../services/gmailService';
 import { RelevanceScorer } from '../services/relevanceScorer';
 import { CacheManager } from '../utils/cache';
+import { SecurityValidator } from '../utils/SecurityValidator';
+import { ErrorHandler } from '../utils/ErrorHandler';
 import { MarketDataItem, SearchQuery } from '../types/marketData';
 
 export class SearchTools {
@@ -15,26 +17,64 @@ export class SearchTools {
   ) {}
 
   async searchMarketData(args: any): Promise<any> {
-    const { 
-      query, 
-      sources, 
-      timeframe = '7d', 
-      min_relevance = 50 
-    }: SearchQuery & { min_relevance: number } = args;
-
-    if (!query || query.trim().length === 0) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Error: Search query cannot be empty.'
-          }
-        ]
-      };
-    }
-
     try {
-      const cacheKey = this.cache.generateKey('search', { query, sources, timeframe, min_relevance });
+      // Validate request structure for security
+      if (!SecurityValidator.validateRequestStructure(args)) {
+        const error = ErrorHandler.createStructuredError(
+          'INVALID_REQUEST_STRUCTURE',
+          'Request structure validation failed'
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Error: Invalid request structure.'
+            }
+          ]
+        };
+      }
+
+      // Sanitize all input parameters
+      const sanitizedArgs = SecurityValidator.sanitizeInput(args);
+      
+      const { 
+        query, 
+        sources, 
+        timeframe = '7d', 
+        min_relevance = 50 
+      }: SearchQuery & { min_relevance: number } = sanitizedArgs;
+
+      // Sanitize and validate the search query
+      if (!query || query.trim().length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Error: Search query cannot be empty.'
+            }
+          ]
+        };
+      }
+
+      const sanitizedQuery = SecurityValidator.sanitizeSearchQuery(query);
+      
+      if (sanitizedQuery !== query) {
+        // Log potential security issue but continue with sanitized query
+        console.warn('Search query was sanitized for security:', { original: query, sanitized: sanitizedQuery });
+      }
+
+      if (sanitizedQuery.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Error: Search query contains only invalid characters.'
+            }
+          ]
+        };
+      }
+
+      const cacheKey = this.cache.generateKey('search', { query: sanitizedQuery, sources, timeframe, min_relevance });
       
       // Try cache first
       const cached = await this.cache.get(cacheKey);
@@ -43,7 +83,7 @@ export class SearchTools {
           content: [
             {
               type: 'text',
-              text: this.formatSearchResponse(cached, { query, sources, timeframe, min_relevance, cached: true })
+              text: this.formatSearchResponse(cached, { query: sanitizedQuery, sources, timeframe, min_relevance, cached: true })
             }
           ]
         };
@@ -56,15 +96,15 @@ export class SearchTools {
       const searchPromises: Promise<MarketDataItem[]>[] = [];
 
       if (searchSources.includes('news')) {
-        searchPromises.push(this.searchNews(query, timeframe));
+        searchPromises.push(this.searchNews(sanitizedQuery, timeframe));
       }
 
       if (searchSources.includes('podcast')) {
-        searchPromises.push(this.searchPodcasts(query, timeframe));
+        searchPromises.push(this.searchPodcasts(sanitizedQuery, timeframe));
       }
 
       if (searchSources.includes('email')) {
-        searchPromises.push(this.searchEmails(query, timeframe));
+        searchPromises.push(this.searchEmails(sanitizedQuery, timeframe));
       }
 
       // Execute searches in parallel
@@ -82,14 +122,14 @@ export class SearchTools {
           content: [
             {
               type: 'text',
-              text: `No results found for query: "${query}"`
+              text: `No results found for query: "${sanitizedQuery}"`
             }
           ]
         };
       }
 
       // Enhance each result with scoring
-      const enhancedResults = allResults.map(item => this.enhanceSearchResult(item, query));
+      const enhancedResults = allResults.map(item => this.enhanceSearchResult(item, sanitizedQuery));
 
       // Filter by minimum relevance
       const filteredResults = enhancedResults.filter(item => item.relevanceScore >= min_relevance);
@@ -106,7 +146,7 @@ export class SearchTools {
       // Cache results for 15 minutes
       await this.cache.set(cacheKey, filteredResults, 900);
 
-      const response = this.formatSearchResponse(filteredResults, { query, sources, timeframe, min_relevance });
+      const response = this.formatSearchResponse(filteredResults, { query: sanitizedQuery, sources, timeframe, min_relevance });
 
       return {
         content: [
@@ -117,6 +157,12 @@ export class SearchTools {
         ]
       };
     } catch (error) {
+      const structuredError = ErrorHandler.createStructuredError(
+        'SEARCH_ERROR',
+        'Error occurred during market data search',
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
       return {
         content: [
           {

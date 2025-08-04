@@ -5,16 +5,18 @@ import { CacheManager } from '../utils/cache';
 import { RateLimiter } from '../utils/rateLimiter';
 import { TimeUtils } from '../utils/timeUtils';
 import { MarketDataItem, PodcastSource, ProcessingResult, PodcastEpisode } from '../types/marketData';
+import { BaseService } from './BaseService';
 
-export class PodcastService {
+export class PodcastService extends BaseService {
   private rssParser: RSSParser;
 
   constructor(
     private config: PodcastSource[],
-    private cache: CacheManager,
-    private rateLimiter: RateLimiter,
-    private logger: Logger
+    cache: CacheManager,
+    rateLimiter: RateLimiter,
+    logger: Logger
   ) {
+    super(cache, rateLimiter, logger);
     this.rssParser = new RSSParser({
       timeout: 10000,
       headers: {
@@ -28,47 +30,49 @@ export class PodcastService {
     includeTranscripts: boolean = false
   ): Promise<ProcessingResult> {
     try {
-      const cacheKey = this.cache.generateKey('podcasts', { timeframe, includeTranscripts });
+      const cacheKey = this.generateCacheKey('podcasts', { timeframe, includeTranscripts });
       
-      const cached = await this.cache.get(cacheKey);
-      if (cached) {
-        this.logger.info('Returning cached podcast data');
-        return { success: true, data: cached, cached: true };
-      }
+      const data = await this.cacheOperation(cacheKey, async () => {
+        return await this.fetchPodcastData(timeframe, includeTranscripts);
+      }, TimeUtils.getOptimalCacheTTL('podcast'));
 
-      const enabledSources = this.config.filter(source => source.enabled);
-      const allPodcasts: MarketDataItem[] = [];
-
-      for (const source of enabledSources) {
-        try {
-          const episodes = await this.fetchFromSource(source, timeframe, includeTranscripts);
-          allPodcasts.push(...episodes);
-        } catch (error) {
-          this.logger.error(`Failed to fetch from ${source.name}:`, error);
-        }
-      }
-
-      const filteredPodcasts = allPodcasts.filter(item => 
-        TimeUtils.isWithinTimeframe(item.timestamp, timeframe)
-      );
-
-      filteredPodcasts.sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-
-      const ttl = TimeUtils.getOptimalCacheTTL('podcast');
-      await this.cache.set(cacheKey, filteredPodcasts, ttl);
-
-      this.logger.info(`Fetched ${filteredPodcasts.length} podcast episodes`);
-      
-      return { success: true, data: filteredPodcasts };
+      this.logger.info(`Fetched ${data.length} podcast episodes`);
+      return { success: true, data };
     } catch (error) {
-      this.logger.error('Error fetching podcasts:', error);
+      this.handleError(error as Error, 'getPodcasts');
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error fetching podcasts' 
       };
     }
+  }
+
+  private async fetchPodcastData(
+    timeframe: string,
+    includeTranscripts: boolean
+  ): Promise<MarketDataItem[]> {
+    const enabledSources = this.config.filter(source => source.enabled);
+    const allPodcasts: MarketDataItem[] = [];
+
+    for (const source of enabledSources) {
+      try {
+        const episodes = await this.fetchFromSource(source, timeframe, includeTranscripts);
+        allPodcasts.push(...episodes);
+      } catch (error) {
+        this.handleError(error as Error, `fetchFromSource:${source.name}`);
+        // Continue with other sources
+      }
+    }
+
+    const filteredPodcasts = allPodcasts.filter(item => 
+      TimeUtils.isWithinTimeframe(item.timestamp, timeframe)
+    );
+
+    filteredPodcasts.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return filteredPodcasts;
   }
 
   private async fetchFromSource(
@@ -78,10 +82,7 @@ export class PodcastService {
   ): Promise<MarketDataItem[]> {
     const sourceId = `podcast-${source.name}`;
     
-    return this.rateLimiter.withRetry(
-      sourceId,
-      '10/hour', // Default rate limit for podcasts
-      async () => {
+    return this.executeWithRateLimit(async () => {
         const feed = await this.rssParser.parseURL(source.rssUrl);
         const items: MarketDataItem[] = [];
 
@@ -93,8 +94,7 @@ export class PodcastService {
         }
 
         return items;
-      }
-    );
+      }, sourceId, '10/hour'); // Default rate limit for podcasts
   }
 
   private async convertRSSItemToMarketData(

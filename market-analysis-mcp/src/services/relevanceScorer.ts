@@ -106,7 +106,7 @@ export class RelevanceScorer {
     for (const keyword of this.config.marketKeywords.high) {
       if (text.includes(keyword.toLowerCase())) {
         foundTags.push(keyword);
-        score += 15; // High-value keywords worth 15 points each
+        score += 25; // High-value keywords worth 25 points each (increased from 15)
       }
     }
 
@@ -114,7 +114,7 @@ export class RelevanceScorer {
     for (const keyword of this.config.marketKeywords.medium) {
       if (text.includes(keyword.toLowerCase())) {
         foundTags.push(keyword);
-        score += 8; // Medium-value keywords worth 8 points each
+        score += 15; // Medium-value keywords worth 15 points each (increased from 8)
       }
     }
 
@@ -122,7 +122,7 @@ export class RelevanceScorer {
     for (const keyword of this.config.marketKeywords.low) {
       if (text.includes(keyword.toLowerCase())) {
         foundTags.push(keyword);
-        score += 3; // Low-value keywords worth 3 points each
+        score += 8; // Low-value keywords worth 8 points each (increased from 3)
       }
     }
 

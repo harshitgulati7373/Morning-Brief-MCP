@@ -37,6 +37,10 @@ export class TimeUtils {
   static getRecencyScore(timestamp: string, maxHours: number = 24): number {
     const now = Date.now();
     const targetTime = new Date(timestamp).getTime();
+    
+    // Handle invalid timestamps
+    if (isNaN(targetTime)) return 0;
+    
     const ageHours = (now - targetTime) / (1000 * 60 * 60);
 
     if (ageHours < 0) return 0; // Future dates get 0 score

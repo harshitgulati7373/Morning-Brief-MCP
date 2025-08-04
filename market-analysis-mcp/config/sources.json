@@ -85,13 +85,13 @@
   },
   "relevanceScoring": {
     "marketKeywords": {
-      "high": ["earnings", "fed", "federal reserve", "interest rates", "inflation", "gdp", "unemployment", "artificial intelligence", "ai", "bitcoin", "cryptocurrency", "recession", "china trade"],
-      "medium": ["market", "trading", "stock", "bond", "crypto", "forex", "semiconductor", "electric vehicle", "ev", "renewable energy", "supply chain", "geopolitics"],
-      "low": ["price", "volume", "trend", "analysis", "technical analysis", "chart", "support", "resistance"]
+      "high": ["earnings", "fed", "federal reserve", "interest rates", "inflation", "gdp", "unemployment", "artificial intelligence", "ai", "bitcoin", "cryptocurrency", "recession", "china trade", "jobs report", "cpi", "ppi", "fomc", "quantitative easing", "yield curve", "treasury", "economic data", "labor market", "consumer spending", "retail sales", "housing market", "oil prices", "energy prices", "commodities", "gold", "silver"],
+      "medium": ["market", "trading", "stock", "stocks", "bond", "bonds", "crypto", "forex", "semiconductor", "electric vehicle", "ev", "renewable energy", "supply chain", "geopolitics", "wall street", "nasdaq", "s&p 500", "dow jones", "russell", "vix", "volatility", "options", "futures", "dividend", "merger", "acquisition", "ipo", "buyback", "guidance", "analyst", "upgrade", "downgrade", "target price", "bull market", "bear market", "correction", "rally", "selloff"],
+      "low": ["price", "volume", "trend", "analysis", "technical analysis", "chart", "support", "resistance", "moving average", "rsi", "macd", "bollinger bands", "fibonacci", "breakout", "momentum", "overbought", "oversold", "pattern", "candlestick", "trend line"]
     },
     "weights": {
-      "marketKeywords": 35,
-      "stockSymbols": 35,
+      "marketKeywords": 40,
+      "stockSymbols": 30,
       "sourceAuthority": 20,
       "recency": 10
     }

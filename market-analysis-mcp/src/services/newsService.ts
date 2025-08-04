@@ -4,7 +4,10 @@ import { Logger } from 'winston';
 import { CacheManager } from '../utils/cache';
 import { RateLimiter } from '../utils/rateLimiter';
 import { TimeUtils } from '../utils/timeUtils';
+import { SecurityValidator } from '../utils/SecurityValidator';
+import { ErrorHandler } from '../utils/ErrorHandler';
 import { MarketDataItem, NewsSource, ProcessingResult } from '../types/marketData';
+import { BaseService } from './BaseService';
 
 interface NewsConfig {
   sources: NewsSource[];
@@ -20,15 +23,16 @@ interface RSSItem {
   guid?: string;
 }
 
-export class NewsService {
+export class NewsService extends BaseService {
   private rssParser: RSSParser;
 
   constructor(
     private config: NewsConfig,
-    private cache: CacheManager,
-    private rateLimiter: RateLimiter,
-    private logger: Logger
+    cache: CacheManager,
+    rateLimiter: RateLimiter,
+    logger: Logger
   ) {
+    super(cache, rateLimiter, logger);
     this.rssParser = new RSSParser({
       timeout: 10000,
       headers: {
@@ -43,88 +47,83 @@ export class NewsService {
     limit: number = 20
   ): Promise<ProcessingResult> {
     try {
-      const cacheKey = this.cache.generateKey('news', { timeframe, symbols, limit });
+      const cacheKey = this.generateCacheKey('news', { timeframe, symbols, limit });
       
-      // Try cache first
-      const cached = await this.cache.get(cacheKey);
-      if (cached) {
-        this.logger.info('Returning cached news data');
-        return { success: true, data: cached, cached: true };
-      }
+      const data = await this.cacheOperation(cacheKey, async () => {
+        return await this.fetchNewsData(timeframe, symbols, limit);
+      }, TimeUtils.getOptimalCacheTTL('news'));
 
-      const enabledSources = this.config.sources.filter(source => source.enabled);
-      const allNews: MarketDataItem[] = [];
-
-      // Fetch from all enabled sources
-      for (const source of enabledSources) {
-        try {
-          const news = await this.fetchFromSource(source, timeframe);
-          allNews.push(...news);
-        } catch (error) {
-          this.logger.error(`Failed to fetch from ${source.name}:`, error);
-          // Continue with other sources
-        }
-      }
-
-      // Filter by symbols if provided
-      let filteredNews = allNews;
-      if (symbols && symbols.length > 0) {
-        filteredNews = allNews.filter(item => 
-          symbols.some(symbol => 
-            item.symbols?.includes(symbol) ||
-            item.title.toUpperCase().includes(symbol) ||
-            item.content.toUpperCase().includes(symbol)
-          )
-        );
-      }
-
-      // Filter by timeframe
-      filteredNews = filteredNews.filter(item => 
-        TimeUtils.isWithinTimeframe(item.timestamp, timeframe)
-      );
-
-      // Sort by relevance score and timestamp
-      filteredNews.sort((a, b) => {
-        if (a.relevanceScore !== b.relevanceScore) {
-          return b.relevanceScore - a.relevanceScore;
-        }
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-      });
-
-      // Limit results
-      const limitedNews = filteredNews.slice(0, limit);
-
-      // Cache results
-      const ttl = TimeUtils.getOptimalCacheTTL('news');
-      await this.cache.set(cacheKey, limitedNews, ttl);
-
-      this.logger.info(`Fetched ${limitedNews.length} news articles from ${enabledSources.length} sources`);
-      
-      return { success: true, data: limitedNews };
+      this.logger.info(`Fetched ${data.length} news articles`);
+      return { success: true, data };
     } catch (error) {
-      this.logger.error('Error fetching news:', error);
+      this.handleError(error as Error, 'getNews');
       return { 
         success: false, 
+        data: [],
         error: error instanceof Error ? error.message : 'Unknown error fetching news' 
       };
     }
   }
 
+  private async fetchNewsData(
+    timeframe: string,
+    symbols?: string[],
+    limit: number = 20
+  ): Promise<MarketDataItem[]> {
+    const enabledSources = this.config.sources.filter(source => source.enabled);
+    const allNews: MarketDataItem[] = [];
+
+    // Fetch from all enabled sources
+    for (const source of enabledSources) {
+      try {
+        const news = await this.fetchFromSource(source, timeframe);
+        allNews.push(...news);
+      } catch (error) {
+        this.handleError(error as Error, `fetchFromSource:${source.name}`);
+        // Continue with other sources
+      }
+    }
+
+    // Filter by symbols if provided
+    let filteredNews = allNews;
+    if (symbols && symbols.length > 0) {
+      filteredNews = allNews.filter(item => 
+        symbols.some(symbol => 
+          item.symbols?.includes(symbol) ||
+          item.title.toUpperCase().includes(symbol) ||
+          item.content.toUpperCase().includes(symbol)
+        )
+      );
+    }
+
+    // Filter by timeframe
+    filteredNews = filteredNews.filter(item => 
+      TimeUtils.isWithinTimeframe(item.timestamp, timeframe)
+    );
+
+    // Sort by relevance score and timestamp
+    filteredNews.sort((a, b) => {
+      if (a.relevanceScore !== b.relevanceScore) {
+        return b.relevanceScore - a.relevanceScore;
+      }
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
+
+    // Limit results
+    return filteredNews.slice(0, limit);
+  }
+
   private async fetchFromSource(source: NewsSource, timeframe: string): Promise<MarketDataItem[]> {
     const sourceId = `news-${source.name}`;
     
-    return this.rateLimiter.withRetry(
-      sourceId,
-      source.rateLimit,
-      async () => {
-        if (source.type === 'rss') {
-          return this.fetchFromRSS(source);
-        } else if (source.type === 'api') {
-          return this.fetchFromAPI(source, timeframe);
-        }
-        throw new Error(`Unsupported source type: ${source.type}`);
+    return this.executeWithRateLimit(async () => {
+      if (source.type === 'rss') {
+        return this.fetchFromRSS(source);
+      } else if (source.type === 'api') {
+        return this.fetchFromAPI(source, timeframe);
       }
-    );
+      throw new Error(`Unsupported source type: ${source.type}`);
+    }, sourceId, source.rateLimit);
   }
 
   private async fetchFromRSS(source: NewsSource): Promise<MarketDataItem[]> {
@@ -159,8 +158,17 @@ export class NewsService {
       switch (source.name) {
         case 'NewsAPI.org':
           apiKey = process.env.NEWSAPI_ORG_API_KEY || '';
+          if (!SecurityValidator.validateApiKey(apiKey)) {
+            const error = ErrorHandler.createStructuredError(
+              'INVALID_API_KEY',
+              `Invalid or missing API key for ${source.name}`,
+              { source: source.name }
+            );
+            throw new Error(`Invalid or missing API key for ${source.name}`);
+          }
           params = {
             apiKey,
+            q: 'stock market OR economy OR earnings OR fed OR trading OR nasdaq OR s&p OR dow OR stocks',
             domains: 'bloomberg.com,reuters.com,marketwatch.com,cnbc.com,wsj.com',
             sortBy: 'publishedAt',
             language: 'en',
@@ -171,9 +179,18 @@ export class NewsService {
 
         case 'Alpha Vantage News':
           apiKey = process.env.ALPHA_VANTAGE_API_KEY || '';
+          if (!SecurityValidator.validateApiKey(apiKey)) {
+            const error = ErrorHandler.createStructuredError(
+              'INVALID_API_KEY',
+              `Invalid or missing API key for ${source.name}`,
+              { source: source.name }
+            );
+            throw new Error(`Invalid or missing API key for ${source.name}`);
+          }
           params = {
             function: 'NEWS_SENTIMENT',
             apikey: apiKey,
+            topics: 'technology,finance,economy,real_estate,manufacturing,financial_markets',
             limit: 50,
             time_from: this.getTimeframeDate(timeframe)
           };
@@ -181,6 +198,14 @@ export class NewsService {
 
         case 'Financial Modeling Prep':
           apiKey = process.env.FINANCIAL_MODELING_PREP_API_KEY || '';
+          if (!SecurityValidator.validateApiKey(apiKey)) {
+            const error = ErrorHandler.createStructuredError(
+              'INVALID_API_KEY',
+              `Invalid or missing API key for ${source.name}`,
+              { source: source.name }
+            );
+            throw new Error(`Invalid or missing API key for ${source.name}`);
+          }
           params = {
             apikey: apiKey,
             limit: 50
@@ -191,8 +216,16 @@ export class NewsService {
           // Legacy API handling
           if (source.auth === 'bearer') {
             const envKey = `${source.name.toUpperCase().replace(/\s+/g, '_')}_API_KEY`;
-            if (process.env[envKey]) {
-              headers['Authorization'] = `Bearer ${process.env[envKey]}`;
+            const legacyApiKey = process.env[envKey] || '';
+            if (legacyApiKey && SecurityValidator.validateApiKey(legacyApiKey)) {
+              headers['Authorization'] = `Bearer ${legacyApiKey}`;
+            } else if (legacyApiKey) {
+              const error = ErrorHandler.createStructuredError(
+                'INVALID_API_KEY',
+                `Invalid API key format for ${source.name}`,
+                { source: source.name, envKey }
+              );
+              this.logger.warn('Invalid API key format detected', error);
             }
           }
           params = { limit: 50, timeframe: timeframe };
@@ -402,7 +435,15 @@ export class NewsService {
 
   async searchNews(query: string, timeframe: string = '7d', limit: number = 50): Promise<MarketDataItem[]> {
     try {
-      const cacheKey = this.cache.generateKey('news-search', { query, timeframe, limit });
+      // Sanitize search query for security
+      const sanitizedQuery = SecurityValidator.sanitizeSearchQuery(query);
+      
+      if (sanitizedQuery.length === 0) {
+        this.logger.warn('Search query contained only invalid characters', { originalQuery: query });
+        return [];
+      }
+      
+      const cacheKey = this.generateCacheKey('news-search', { query: sanitizedQuery, timeframe, limit });
       
       // Try cache first
       const cached = await this.cache.get(cacheKey);
@@ -417,7 +458,7 @@ export class NewsService {
         return [];
       }
 
-      const queryLower = query.toLowerCase();
+      const queryLower = sanitizedQuery.toLowerCase();
       const filteredNews = newsResult.data.filter(item => 
         item.title.toLowerCase().includes(queryLower) ||
         item.content.toLowerCase().includes(queryLower) ||
